@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mercado Virtual – Pemba</title>
+<meta name="description" content="Compre online em Pemba e receba em casa. Pague por M-Pesa ou e-Mola.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap">
+<style>
+:root{--bg:#EEF3F1;--card:#fff;--ink:#0F2A2E;--mut:#5B726F;--sea:#0E7C7B;--seaI:#fff;--mango:#F2A33A;--line:#D3DFDC;--bad:#B3261E}
+@media(prefers-color-scheme:dark){:root{--bg:#0C1A1C;--card:#13272A;--ink:#E6F0EE;--mut:#93ACA8;--sea:#3CC2BE;--seaI:#06201F;--mango:#F2B25C;--line:#25413F;--bad:#FF8A80}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Bricolage Grotesque",system-ui,sans-serif;padding-bottom:env(safe-area-inset-bottom,0px)}
+header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:10px 16px;padding-top:calc(10px + env(safe-area-inset-top,0px))}
+.brand{font-weight:800;font-size:20px;letter-spacing:-.02em;margin-right:auto}
+.brand span{color:var(--sea)}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+.btn{background:var(--sea);color:var(--seaI);border:0;border-radius:10px;padding:10px 16px;font-weight:600}
+.btn.alt{background:none;color:var(--ink);border:1px solid var(--line)}
+.btn.sm{padding:4px 10px}
+.btn:focus-visible,.chip:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--mango);outline-offset:2px}
+main{max-width:980px;margin:0 auto;padding:16px}
+h1{font-size:clamp(26px,6vw,42px);line-height:1.1;letter-spacing:-.03em;margin:8px 0 6px;font-weight:800}
+h2{font-size:20px;margin:0 0 8px}
+.mut{color:var(--mut)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:6px 14px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.prod{display:flex;flex-direction:column;gap:4px}
+.emo{font-size:44px;line-height:1}
+.foto{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px}
+.price{font-weight:800;font-size:18px}
+.prod .btn{margin-top:auto}
+footer{max-width:980px;margin:24px auto;padding:0 16px 24px;color:var(--mut);font-size:14px}
+dialog{width:min(560px,94vw);max-height:92vh;overflow:auto;border:1px solid var(--line);border-radius:16px;background:var(--card);color:var(--ink);padding:18px}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+table{width:100%;border-collapse:collapse}
+td{padding:6px 4px;border-bottom:1px solid var(--line);vertical-align:middle}
+label{display:block;font-weight:600;font-size:14px;margin:10px 0 4px}
+input,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.tot{font-weight:800;font-size:20px;margin:10px 0}
+.err{color:var(--bad);min-height:1.4em;margin:6px 0 0}
+.pay{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Mercado <span>Virtual</span></div>
+  <button class="btn" id="cartBtn">Carrinho (0)</button>
+</header>
+<main>
+  <h1>Compre online em Pemba e receba em casa.</h1>
+  <p class="mut">Pague por M-Pesa ou e-Mola. O pedido é confirmado por WhatsApp.</p>
+  <div class="chips" id="chips"></div>
+  <div class="grid" id="grid"></div>
+</main>
+<footer>
+  <p>Entregamos só em Pemba por agora. A taxa de entrega é combinada por WhatsApp.</p>
+  <p id="contactos"></p>
+</footer>
+<dialog id="dlg" aria-label="Carrinho e pedido"><div id="dbody"></div></dialog>
+
+<script>
+/* ====== EDITE AQUI: dados da loja e produtos ====== */
+const LOJA={
+  zap:"258868134756",            // WhatsApp que recebe os pedidos (com 258 à frente)
+  zapMostrar:"86 813 4756",
+  zap2:"84 339 3162",
+  titular:"Yacir Amina Buanassau",
+  pag:{mpesa:{nome:"M-Pesa",num:"84 285 1644"},emola:{nome:"e-Mola",num:"86 232 9917"}}
+};
+const PRODUTOS=[ // um produto por linha: id, nome, categoria, preço em meticais, emoji
+ {id:1,n:"Game Stick 4K com 2 comandos sem fios",c:"Eletrónicos",p:3000,e:"🎮"}
+];
+/* ================================================== */
+
+const $=s=>document.querySelector(s);
+const fmt=n=>new Intl.NumberFormat("pt-MZ").format(n)+" MT";
+const byId=id=>PRODUTOS.find(p=>p.id==id);
+let cart=(()=>{try{return JSON.parse(localStorage.getItem("mv-cart"))||{}}catch(e){return{}}})();
+const save=()=>{try{localStorage.setItem("mv-cart",JSON.stringify(cart))}catch(e){}};
+let cat="Todos",step=1,order=null,form={nome:"",tel:"",end:"",pag:"mpesa"};
+cart=Object.fromEntries(Object.entries(cart).filter(([id,q])=>byId(id)&&q>0));
+
+const total=()=>Object.entries(cart).reduce((s,[id,q])=>s+byId(id).p*q,0);
+const count=()=>Object.values(cart).reduce((s,q)=>s+q,0);
+
+function drawShop(){
+  $("#cartBtn").textContent=`Carrinho (${count()})`;
+  const cats=["Todos",...new Set(PRODUTOS.map(p=>p.c))];
+  $("#chips").innerHTML=cats.map(c=>`<button class="chip" aria-pressed="${c===cat}" data-a="cat" data-v="${c}">${c}</button>`).join("");
+  $("#grid").innerHTML=PRODUTOS.filter(p=>cat==="Todos"||p.c===cat).map(p=>`<div class="card prod">${p.img?`<img class="foto" src="${p.img}" alt="${p.n}">`:`<div class="emo" aria-hidden="true">${p.e}</div>`}<b>${p.n}</b><span class="price">${fmt(p.p)}</span><button class="btn" data-a="add" data-v="${p.id}">Adicionar</button></div>`).join("");
+  $("#contactos").textContent=`Dúvidas? WhatsApp ${LOJA.zapMostrar} ou ${LOJA.zap2}.`;
+}
+
+function drawDlg(){
+  const d=$("#dbody"),ids=Object.keys(cart);
+  if(step===3){
+    d.innerHTML=`<h2>Pedido enviado</h2><p>O seu código é <b>${order.code}</b>. Aguarde a confirmação do pagamento no WhatsApp.</p><p class="mut">Se o WhatsApp não abriu, <a href="${order.url}" target="_blank" rel="noopener">toque aqui para enviar a mensagem</a>.</p><div class="row"><button class="btn" data-a="close">Fechar</button></div>`;return;
+  }
+  if(!ids.length){d.innerHTML=`<h2>Carrinho</h2><p class="mut">O carrinho está vazio.</p><div class="row"><button class="btn alt" data-a="close">Fechar</button></div>`;return;}
+  if(step===1){
+    d.innerHTML=`<h2>O seu pedido</h2><table>${ids.map(id=>`<tr><td>${byId(id).n}</td><td><button class="btn alt sm" data-a="minus" data-v="${id}" aria-label="Menos um">−</button> ${cart[id]} <button class="btn alt sm" data-a="plus" data-v="${id}" aria-label="Mais um">+</button></td><td>${fmt(byId(id).p*cart[id])}</td></tr>`).join("")}</table>
+    <div class="tot">Total: ${fmt(total())}</div>
+    <label for="f-nome">Nome</label><input id="f-nome" autocomplete="name">
+    <label for="f-tel">O seu telemóvel</label><input id="f-tel" inputmode="tel" autocomplete="tel" placeholder="84 000 0000">
+    <label for="f-end">Bairro e ponto de referência em Pemba</label><input id="f-end" placeholder="Ex.: Cimento, perto do mercado">
+    <label for="f-pag">Pagamento</label><select id="f-pag"><option value="mpesa">M-Pesa</option><option value="emola">e-Mola</option></select>
+    <p class="err" id="err" role="alert"></p>
+    <div class="row"><button class="btn" data-a="next">Continuar</button><button class="btn alt" data-a="close">Voltar à loja</button></div>`;
+    $("#f-nome").value=form.nome;$("#f-tel").value=form.tel;$("#f-end").value=form.end;$("#f-pag").value=form.pag;
+  }else{
+    const p=LOJA.pag[form.pag];
+    d.innerHTML=`<h2>Pague e envie o pedido</h2><div class="pay"><p>1. Transfira <b>${fmt(total())}</b> por <b>${p.nome}</b> para o número <b>${p.num}</b>, conta em nome de ${LOJA.titular}.</p><p>2. Se a transferência permitir mensagem, escreva a referência <b>${order.code}</b>.</p><p>3. Escreva abaixo o número da transação que recebeu por SMS.</p></div>
+    <label for="f-tx">Número da transação</label><input id="f-tx" autocomplete="off">
+    <p class="err" id="err" role="alert"></p>
+    <div class="row"><button class="btn" data-a="send">Enviar pedido no WhatsApp</button><button class="btn alt" data-a="back">Voltar</button></div>`;
+  }
+}
+
+function readForm(){
+  if(step!==1)return;
+  form={nome:$("#f-nome").value.trim(),tel:$("#f-tel").value.trim(),end:$("#f-end").value.trim(),pag:$("#f-pag").value};
+}
+function mensagem(tx){
+  const linhas=Object.entries(cart).map(([id,q])=>`- ${q}× ${byId(id).n}: ${fmt(byId(id).p*q)}`).join("\n");
+  return `Novo pedido ${order.code}\nCliente: ${form.nome}\nTelemóvel: ${form.tel}\nEntrega em Pemba: ${form.end}\n\nItens:\n${linhas}\n\nTotal: ${fmt(total())}\nPagamento: ${LOJA.pag[form.pag].nome} para ${LOJA.pag[form.pag].num}\nNúmero da transação: ${tx}`;
+}
+const open_=()=>{$("#dlg").showModal();drawDlg();};
+
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-a]");if(!b)return;
+  const a=b.dataset.a,v=b.dataset.v;
+  if(a==="cat"){cat=v;drawShop();return;}
+  if(a==="add"){cart[v]=(cart[v]||0)+1;save();drawShop();return;}
+  if(a==="plus"){readForm();cart[v]++;save();drawShop();drawDlg();return;}
+  if(a==="minus"){readForm();cart[v]--;if(cart[v]<=0)delete cart[v];save();drawShop();drawDlg();return;}
+  if(a==="close"){$("#dlg").close();return;}
+  if(a==="back"){step=1;drawDlg();return;}
+  if(a==="next"){
+    readForm();
+    const err=$("#err");
+    if(form.nome.length<2){err.textContent="Escreva o seu nome.";return;}
+    if(form.tel.replace(/\D/g,"").length<9){err.textContent="Escreva um telemóvel com 9 dígitos.";return;}
+    if(form.end.length<3){err.textContent="Diga o bairro e um ponto de referência.";return;}
+    order={code:"MV-"+Date.now().toString(36).slice(-5).toUpperCase()};
+    step=2;drawDlg();return;
+  }
+  if(a==="send"){
+    const tx=$("#f-tx").value.trim();
+    if(tx.length<6){$("#err").textContent="Escreva o número da transação que recebeu por SMS.";return;}
+    order.url=`https://wa.me/${LOJA.zap}?text=${encodeURIComponent(mensagem(tx))}`;
+    window.open(order.url,"_blank","noopener");
+    cart={};save();step=3;drawShop();drawDlg();return;
+  }
+});
+$("#cartBtn").addEventListener("click",()=>{step=1;open_();});
+drawShop();
+</script>
+</body>
+</html>
